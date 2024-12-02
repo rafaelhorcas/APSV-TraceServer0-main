@@ -13,7 +13,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import es.upm.dit.apsv.traceserver.model.Trace;
-//import es.upm.dit.apsv.traceserver.model.TransportationOrder;
+import es.upm.dit.apsv.traceserver.model.TransportationOrder;
 import es.upm.dit.apsv.traceserver.repository.TraceRepository;
 
 @SpringBootApplication
@@ -21,7 +21,7 @@ public class TraceServerApplication {
 
 	@Autowired
 	private Environment env;
-	
+
 	public static final Logger log = LoggerFactory.getLogger(TraceServerApplication.class);
 
 	private final TraceRepository tr;
@@ -35,11 +35,58 @@ public class TraceServerApplication {
 		log.info("Prueba consumer arrancando...");
 	}
 
-	@Bean("consumer")
+	/*@Bean("consumer")
 	public Consumer<Trace> checkTrace() {
 		return t -> {
-                          log.info("Order: "+ t);
-			}
-		};
-	}
-}
+						  log.info("Order: "+ t);
+			};
+		};*/
+
+		@Bean("consumer")
+
+        public Consumer<Trace> checkTrace() {
+
+                return t -> {
+
+                        t.setTraceId(t.getTruck() + t.getLastSeen());
+
+                        tr.save(t);
+
+                      String uri = "http://localhost:8080/transportationorders/";
+
+                        RestTemplate restTemplate = new RestTemplate();
+
+                        TransportationOrder result = null;
+
+                        try {                        
+
+                          result = restTemplate.getForObject(uri
+
+                           + t.getTruck(), TransportationOrder.class);
+
+                        } catch (HttpClientErrorException.NotFound ex)   {
+
+                                result = null;
+
+                        }
+
+                        if (result != null && result.getSt() == 0) {
+
+                                result.setLastDate(t.getLastSeen());
+
+                                result.setLastLat(t.getLat());
+
+                                result.setLastLong(t.getLng());
+
+                                if (result.distanceToDestination() < 10)
+
+                                        result.setSt(1);
+
+                                restTemplate.put(uri, result, TransportationOrder.class);
+
+                                log.info("Order updated: "+ result);
+
+                        }
+
+                };
+}}
